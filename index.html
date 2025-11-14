@@ -1,1 +1,161 @@
-<h1>Thirst Bet Frontend Live</h1>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Thirst Bet</title>
+  <style>
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b1620; color:#e9f1ff; }
+    .wrap { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+    .h1 { font-size: 34px; font-weight: 800; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .sub { color:#98a6bd; margin-bottom:20px; }
+    .card { background:#0f1e2d; border-radius:16px; padding:16px; margin:16px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .card-head div { font-weight:700; letter-spacing:0.5px; }
+    button { background:#213147; color:#cfe1ff; border:0; border-radius:12px; padding:8px 14px; font-weight:600; cursor:pointer; }
+    button[disabled]{ opacity:.5; cursor:not-allowed; }
+    button:active { transform: translateY(1px); }
+    .lines { color:#c3cee3; min-height:24px; }
+    .line-row { display:grid; grid-template-columns: 1fr auto; gap:10px; padding:10px 0; border-top:1px solid rgba(255,255,255,0.06); }
+    .line-row:first-child { border-top:0; }
+    .teams { font-weight:600; }
+    .prices, .time { color:#9ab0c9; font-size:14px; }
+    .time { grid-column: 1 / -1; }
+    #dbg { position:fixed; bottom:10px; left:10px; right:10px; opacity:.85; font:12px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color:#9ab0c9; }
+    .wallet-box { background:#102437; border-radius:12px; padding:12px 16px; margin-bottom:20px; display:flex; flex-direction:column; gap:8px; }
+    .wallet-box input { background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:8px; color:#e9f1ff; width:100%; }
+    .leaderboard { margin-top:20px; font-size:14px; }
+    .leaderboard div { padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="h1">💧 Thirst Bet</div>
+    <div class="sub">
+      Auto-loaded live lines from <strong>TheOddsAPI</strong> (NFL & NBA).
+    </div>
+
+    <!-- Wallet Verification -->
+    <div class="wallet-box">
+      <div><strong>Verify Wallet</strong></div>
+      <input id="walletAddr" placeholder="Enter your Solana wallet address" />
+      <button id="verifyBtn">Verify Wallet</button>
+      <div id="walletStatus" style="font-size:14px;color:#9ab0c9;"></div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="card" id="leaderboardCard" style="display:none;">
+      <div class="card-head">
+        <div>Leaderboard</div>
+        <button id="refreshBoard">Refresh</button>
+      </div>
+      <div class="leaderboard" id="leaderboardBody">Loading...</div>
+    </div>
+
+    <!-- NFL -->
+    <div class="card" data-sport="NFL">
+      <div class="card-head">
+        <div>NFL</div>
+        <button data-action="refresh" data-sport="NFL">Refresh</button>
+      </div>
+      <div class="lines">No lines available right now.</div>
+    </div>
+
+    <!-- NBA -->
+    <div class="card" data-sport="NBA">
+      <div class="card-head">
+        <div>NBA</div>
+        <button data-action="refresh" data-sport="NBA">Refresh</button>
+      </div>
+      <div class="lines">No lines available right now.</div>
+    </div>
+  </div>
+
+  <div id="dbg">booting…</div>
+
+  <script>
+  (function () {
+    var API_BASE = 'https://thirst-bet-backend.onrender.com';
+    var uidKey = 'thirst_uid';
+    if (!localStorage.getItem(uidKey)) localStorage.setItem(uidKey, 'user-' + Math.random().toString(36).slice(2));
+    var USER_ID = localStorage.getItem(uidKey);
+
+    function setDbg(msg) {
+      var el = document.getElementById('dbg');
+      if (el) el.textContent = String(msg);
+    }
+
+    function fetchJSON(url, opts) {
+      opts = opts || {};
+      opts.headers = Object.assign({
+        'x-user-id': USER_ID,
+        'Content-Type': 'application/json'
+      }, opts.headers || {});
+      return fetch(url, opts).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      });
+    }
+
+    // --- Wallet Verify ---
+    var verifyBtn = document.getElementById('verifyBtn');
+    var walletInput = document.getElementById('walletAddr');
+    var walletStatus = document.getElementById('walletStatus');
+
+    verifyBtn.onclick = async function() {
+      var addr = walletInput.value.trim();
+      if (!addr) return alert('Enter wallet address');
+      walletStatus.textContent = 'Checking balance...';
+      verifyBtn.disabled = true;
+      try {
+        var res = await fetchJSON(API_BASE + '/wallet/verify', {
+          method: 'POST',
+          body: JSON.stringify({ address: addr })
+        });
+        if (res.verified) {
+          walletStatus.innerHTML = '✅ Verified! $500 bankroll ready.';
+          document.getElementById('leaderboardCard').style.display = 'block';
+          loadLeaderboard();
+        } else {
+          walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
+        }
+      } catch (e) {
+        walletStatus.textContent = 'Error: ' + (e.message || e);
+      } finally {
+        verifyBtn.disabled = false;
+      }
+    };
+
+    // --- Leaderboard ---
+    async function loadLeaderboard() {
+      var body = document.getElementById('leaderboardBody');
+      body.textContent = 'Loading...';
+      try {
+        var res = await fetchJSON(API_BASE + '/leaderboard/overall');
+        if (res.leaderboard && res.leaderboard.length) {
+          body.innerHTML = res.leaderboard.map(r =>
+            '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + r.bankroll + '</div>'
+          ).join('');
+        } else {
+          body.textContent = 'No players yet.';
+        }
+      } catch (e) {
+        body.textContent = 'Error loading leaderboard';
+      }
+    }
+    document.getElementById('refreshBoard').onclick = loadLeaderboard;
+
+    // --- Odds loader (existing) ---
+    function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
+    function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+    function pickLine(c){if(c&&c.line&&(c.line.priceA!==void 0||c.line.priceB!==void 0)){return{a:c.line.selectionA||'A',b:c.line.selectionB||'B',pa:c.line.priceA,pb:c.line.priceB,ts:c.startsAt||c.commenceTime}}if(c&&c.bestLine){return{a:c.bestLine.selectionA||'A',b:c.bestLine.selectionB||'B',pa:c.bestLine.priceA,pb:c.bestLine.priceB,ts:c.startsAt||c.commenceTime}}if(c&&c.line){return{a:c.line.selectionA||'A',b:c.line.selectionB||'B',pa:c.line.priceA,pb:c.line.priceB,ts:c.startsAt||c.commenceTime}}return null}
+    function formatPrice(x){if(x===null||x===undefined||x==='')return'';var n=Number(x);if(!isFinite(n))return String(x);return(n>0?'+':'')+Math.round(n)}
+    function renderLines(target,items,used){if(!items||!items.length){target.textContent='No lines available right now.';return}var html='';for(var i=0;i<Math.min(items.length,50);i++){var c=items[i];var L=pickLine(c)||{a:'A',b:'B',pa:'',pb:''};var a=L.a||'A';var b=L.b||'B';var pa=formatPrice(L.pa);var pb=formatPrice(L.pb);html+='<div class="line-row"><div class="teams">'+escapeHtml(a)+' vs '+escapeHtml(b)+'</div><div class="prices">'+escapeHtml(pa)+' · '+escapeHtml(pb)+'</div><div class="time">'+escapeHtml(asTime(L.ts))+'</div></div>'}target.innerHTML=html;setDbg(used.sport+': '+items.length+' contests ← '+used.endpoint)}
+    function setBusy(sport,busy){var btn=document.querySelector('[data-action="refresh"][data-sport="'+sport+'"]');if(!btn)return;btn.disabled=!!busy;btn.textContent=busy?'Loading…':'Refresh'}
+    function loadSport(sport){var box=document.querySelector('[data-sport="'+sport+'"] .lines');if(!box)return;setBusy(sport,true);box.textContent='Loading...';var tried=[];function tryNext(){var next;if(tried.length===0)next=API_BASE+'/odds?sport='+sport;else if(tried.length===1)next=API_BASE+'/live-odds?sport='+sport;else next=API_BASE+'/contests/open?sport='+sport;var label=tried.length===0?'/odds':tried.length===1?'/live-odds':'/contests/open';tried.push(label);setDbg('GET '+next);fetchJSON(next).then(function(res){var arr=(res&&res.data)?res.data:[];if(arr.length===0&&tried.length<3){tryNext()}else{renderLines(box,arr,{sport:sport,endpoint:label})}}).catch(function(e){if(tried.length<3)return tryNext();console.error(e);box.textContent='Failed to load lines.';setDbg(sport+' error: '+(e&&e.message||e))}).then(function(){setBusy(sport,false)})}tryNext()}
+    function bindRefresh(){var buttons=document.querySelectorAll('[data-action="refresh"]');for(var i=0;i<buttons.length;i++){(function(btn){btn.addEventListener('click',function(){loadSport(btn.getAttribute('data-sport'))})})(buttons[i])}}
+    document.addEventListener('DOMContentLoaded',function(){setDbg('booted');bindRefresh();loadSport('NFL');loadSport('NBA')});
+  })();
+  </script>
+</body>
+</html>
