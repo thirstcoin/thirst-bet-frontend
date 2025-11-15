@@ -35,7 +35,7 @@
   <div class="wrap">
     <div class="h1">💧 Thirst Bet</div>
     <div class="sub">Auto-loaded live lines (NFL & NBA).</div>
-    <div class="ver">build: inline-2025-11-15-12b</div>
+    <div class="ver">build: inline-2025-11-15-12c</div>
 
     <div class="wallet-box">
       <div><strong>Verify Wallet</strong></div>
@@ -83,10 +83,8 @@
   <script>
   (function () {
     const API_BASE = 'https://thirst-bet-backend.onrender.com';
-    const uidKey = 'thirst_uid';
-    const walletKey = 'thirst_wallet';
+    const uidKey = 'thirst_uid', walletKey = 'thirst_wallet';
 
-    // Polyfill for CSS.escape (older Safari)
     window.CSS = window.CSS || {};
     CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\|\\.|#|\\[|\\]|:|\\(|\\)|\\s)/g, '\\$1'));
 
@@ -102,10 +100,10 @@
       }, (CURRENT_WALLET ? { 'x-wallet-address': CURRENT_WALLET } : {}), opts.headers || {});
       const r = await fetch(url, opts);
       if (!r.ok) {
-        const text = await r.text().catch(()=> '');
-        const err = new Error(text || ('HTTP ' + r.status));
-        err.status = r.status;
-        throw err;
+        const t = await r.text().catch(()=> '');
+        const e = new Error(t || ('HTTP ' + r.status));
+        e.status = r.status;
+        throw e;
       }
       return r.json();
     }
@@ -130,71 +128,83 @@
       }).join('') || '<div class="muted">No bets yet.</div>';
     }
 
-    async function getOpenContests(sport) {
-      return fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
-    }
-
-    async function ensureOpenLines(sport) {
+    // Fallback loader: contests/open -> sync -> contests/open -> odds
+    async function loadLinesWithFallback(sport) {
       try {
-        const res = await getOpenContests(sport);
-        const data = Array.isArray(res?.data) ? res.data : [];
-        if (data.length) return { data, source: '/contests/open' };
+        const r1 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+        const d1 = Array.isArray(r1?.data) ? r1.data : [];
+        if (d1.length) return { data: d1, source: '/contests/open' };
       } catch (e) {
-        // ignore here; we'll try to sync then refetch
+        if (e && e.status !== 403) console.warn('open failed', e);
+        if (e && e.status === 403) {
+          // still show public odds if wallet not verified
+          try {
+            const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+            const d3 = Array.isArray(r3) ? r3 : (r3.data || []);
+            return { data: d3, source: '/odds (unauth fallback)' };
+          } catch (e3) {
+            return { data: [], source: `error ${e3.status || ''}`.trim() };
+          }
+        }
       }
 
-      // trigger sync then refetch
       try { await fetchJSON(`${API_BASE}/sync/odds?sport=${encodeURIComponent(sport)}`, { method: 'POST' }); } catch(_){}
       await sleep(1200);
-
       try {
-        const res2 = await getOpenContests(sport);
-        const data2 = Array.isArray(res2?.data) ? res2.data : [];
-        return { data: data2, source: data2.length ? '/contests/open (after sync)' : 'none' };
+        const r2 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+        const d2 = Array.isArray(r2?.data) ? r2.data : [];
+        if (d2.length) return { data: d2, source: '/contests/open (after sync)' };
       } catch (e2) {
-        const status = e2 && e2.status;
-        return { data: [], source: status ? `error ${status}` : 'error' };
+        // last resort: public odds
+        try {
+          const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+          const d3 = Array.isArray(r3) ? r3 : (r3.data || []);
+          return { data: d3, source: '/odds' };
+        } catch (e3) {
+          return { data: [], source: `error ${e3.status || ''}`.trim() };
+        }
       }
+      return { data: [], source: 'none' };
+    }
+
+    function pickLine(c){
+      if (!c) return null;
+      if (c.line && (c.line.priceA!==undefined || c.line.priceB!==undefined)) {
+        return { a:c.line.selectionA||'A', b:c.line.selectionB||'B', pa:c.line.priceA, pb:c.line.priceB, ts:c.startsAt, id:c.line.id, cid:c.id };
+      }
+      if (c.bestLine) {
+        return { a:c.bestLine.selectionA||'A', b:c.bestLine.selectionB||'B', pa:c.bestLine.priceA, pb:c.bestLine.priceB, ts:c.startsAt||c.commenceTime, id:c.bestLine.id, cid:c.id };
+      }
+      // very raw odds shape
+      if (c.selectionA || c.selectionB || c.priceA!==undefined || c.priceB!==undefined) {
+        return { a:c.selectionA||'A', b:c.selectionB||'B', pa:c.priceA, pb:c.priceB, ts:c.startsAt||c.commenceTime, id:c.id, cid:c.contestId };
+      }
+      return null;
     }
 
     function renderLines(target, items, sport, source) {
       const srcEl = document.querySelector(`.src[data-src="${sport}"]`);
       if (srcEl) srcEl.textContent = `source: ${source}`;
-
       if (!items || !items.length) { target.textContent = 'No lines available right now.'; return; }
 
       let html = '';
-      const max = Math.min(items.length, 50);
-      for (let i=0;i<max;i++) {
+      for (let i=0;i<Math.min(items.length, 50);i++){
         const c = items[i];
-        const L = c?.line || {};
-        const a = L.selectionA || 'A';
-        const b = L.selectionB || 'B';
-        const pa = fmt(L.priceA);
-        const pb = fmt(L.priceB);
-        const ts = asTime(c.startsAt);
-        const lineId = L.id;
-        const contestId = c.id;
-
-        const disabled = (!lineId || !contestId) ? 'disabled' : '';
-        const hint = (!lineId || !contestId) ? ' (syncing… tap Refresh)' : '';
-
+        const L = pickLine(c) || { a:'A', b:'B', pa:'', pb:'', ts:'', id:null, cid:null };
+        const disabled = (!L.id || !L.cid) ? 'disabled' : '';
+        const hint = (!L.id || !L.cid) ? ' (verify wallet to bet)' : '';
         html += `
           <div class="line-row">
-            <div class="teams">${escapeHtml(a)} vs ${escapeHtml(b)}</div>
-            <div class="prices">${escapeHtml(pa)} · ${escapeHtml(pb)}</div>
-            <div class="time">${ts}</div>
+            <div class="teams">${escapeHtml(L.a)} vs ${escapeHtml(L.b)}</div>
+            <div class="prices">${escapeHtml(fmt(L.pa))} · ${escapeHtml(fmt(L.pb))}</div>
+            <div class="time">${asTime(L.ts)}</div>
             <div class="stake-row">
               <input type="number" min="1" step="1" placeholder="Stake" class="stake-input"
-                     data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">
+                     data-line="${escapeHtml(String(L.id||''))}" data-contest="${escapeHtml(String(L.cid||''))}">
               <button class="betA" ${disabled}
-                      data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">
-                Bet ${escapeHtml(a)}${hint}
-              </button>
+                      data-line="${escapeHtml(String(L.id||''))}" data-contest="${escapeHtml(String(L.cid||''))}">Bet ${escapeHtml(L.a)}${hint}</button>
               <button class="betB" ${disabled}
-                      data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">
-                Bet ${escapeHtml(b)}${hint}
-              </button>
+                      data-line="${escapeHtml(String(L.id||''))}" data-contest="${escapeHtml(String(L.cid||''))}">Bet ${escapeHtml(L.b)}${hint}</button>
             </div>
           </div>`;
       }
@@ -210,7 +220,6 @@
           const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId||'')}"]`);
           const stake = Number(input && input.value ? input.value : '0');
           if (!Number.isInteger(stake) || stake <= 0) return alert('Enter a valid integer stake');
-
           try {
             await fetchJSON(API_BASE + '/bets/wallet', {
               method: 'POST',
@@ -233,7 +242,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
       box.textContent = 'Loading...';
       try {
-        const { data, source } = await ensureOpenLines(sport);
+        const { data, source } = await loadLinesWithFallback(sport);
         renderLines(box, data, sport, source);
       } catch {
         box.textContent = 'Failed to load lines.';
@@ -271,7 +280,7 @@
               document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
               await Promise.all([loadSport('NFL'), loadSport('NBA'), refreshMyWeek()]);
             } else {
-              walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
+              walletStatus.textContent = 'Error: ' + (res.error || 'Wallet not verified');
             }
           } catch (e) {
             walletStatus.textContent = 'Error: ' + (e.message || e);
