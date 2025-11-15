@@ -5,43 +5,42 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Thirst Bet</title>
   <style>
-    :root { --bg:#0b1620; --card:#0f1e2d; --ink:#e9f1ff; --muted:#9ab0c9; --muted2:#98a6bd; --btn:#213147; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--ink); }
-    .wrap { max-width: 720px; margin: 28px auto 80px; padding: 0 16px; }
-    .h1 { font-size: 34px; font-weight: 800; display:flex; align-items:center; gap:10px; margin-bottom:6px; }
-    .sub { color:var(--muted2); margin-bottom:4px; }
-    .ver { color:#667a96; font-size:12px; margin-bottom:16px; }
-    .card { background:var(--card); border-radius:16px; padding:16px; margin:16px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b1620; color:#e9f1ff; }
+    .wrap { max-width: 720px; margin: 32px auto; padding: 0 16px; }
+    .h1 { font-size: 34px; font-weight: 800; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .sub { color:#98a6bd; margin-bottom:6px; }
+    .ver { color:#667a96; font-size:12px; margin-bottom:20px; }
+    .card { background:#0f1e2d; border-radius:16px; padding:16px; margin:16px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
     .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .card-head div { font-weight:700; letter-spacing:0.5px; }
-    button { background:var(--btn); color:#cfe1ff; border:0; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer; }
-    button[disabled]{ opacity:.45; cursor:not-allowed; }
+    button { background:#213147; color:#cfe1ff; border:0; border-radius:12px; padding:8px 14px; font-weight:600; cursor:pointer; }
+    button[disabled]{ opacity:.5; cursor:not-allowed; }
     button:active { transform: translateY(1px); }
     .lines { color:#c3cee3; min-height:24px; }
-    .line-row { border-top:1px solid rgba(255,255,255,0.06); padding:12px 0; }
+    .line-row { display:grid; grid-template-columns: 1fr auto; gap:10px; padding:10px 0; border-top:1px solid rgba(255,255,255,0.06); }
     .line-row:first-child { border-top:0; }
-    .teams { font-weight:700; font-size:18px; margin-bottom:2px; }
-    .meta { display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:14px; margin-bottom:10px; }
-    .stake-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-    .stake-input { width:110px; background:var(--bg); border:1px solid #22344d; border-radius:10px; padding:10px; color:var(--ink); }
-    .muted { color:var(--muted); font-size:14px; }
+    .teams { font-weight:600; }
+    .prices, .time { color:#9ab0c9; font-size:14px; }
+    .time { grid-column: 1 / -1; }
     .wallet-box { background:#102437; border-radius:12px; padding:12px 16px; margin-bottom:20px; display:flex; flex-direction:column; gap:8px; }
-    .wallet-box input { background:var(--bg); border:1px solid #22344d; border-radius:8px; padding:10px; color:var(--ink); width:100%; }
-    .leaderboard { margin-top:8px; font-size:14px; }
-    .leaderboard div { padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
-    /* Toast */
-    #toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%) translateY(10px); background:#0f1e2d; color:#e9f1ff; padding:10px 14px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.45); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:9999; font-weight:700; }
-    #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+    .wallet-box input { background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:8px; color:#e9f1ff; width:100%; }
+    .leaderboard { margin-top:20px; font-size:14px; }
+    .leaderboard div { padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
+    .stake-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
+    .stake-input { width:96px; background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:6px; color:#e9f1ff; }
+    .muted { color:#9ab0c9; font-size:14px; }
+    /* toast */
+    .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#14263a; border:1px solid #234; color:#dff; padding:10px 14px; border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.4); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; font-size:14px; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="h1">💧 Thirst Bet</div>
     <div class="sub">Auto-loaded live lines (NFL & NBA).</div>
-    <div class="ver">build: inline-2025-11-15-14b</div>
+    <div class="ver">build: inline-2025-11-15-15d</div>
 
-    <!-- Wallet Verification -->
+    <!-- Wallet -->
     <div class="wallet-box">
       <div><strong>Verify Wallet</strong></div>
       <input id="walletAddr" placeholder="Enter your Solana wallet address" />
@@ -50,7 +49,7 @@
       <div id="bankroll" class="muted">Bankroll: —</div>
     </div>
 
-    <!-- Leaderboard (weekly) -->
+    <!-- Leaderboard -->
     <div class="card" id="leaderboardCard" style="display:none;">
       <div class="card-head">
         <div>Leaderboard (This Week)</div>
@@ -87,262 +86,235 @@
     </div>
   </div>
 
-  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast"></div>
 
   <script>
-  (function () {
-    const API_BASE = 'https://thirst-bet-backend.onrender.com';
-    const uidKey = 'thirst_uid';
-    const walletKey = 'thirst_wallet';
+  // ===== Inline app =====
+  const API_BASE = 'https://thirst-bet-backend.onrender.com';
+  const uidKey = 'thirst_uid';
+  const walletKey = 'thirst_wallet';
 
-    // Polyfill for CSS.escape (older Safari)
-    window.CSS = window.CSS || {};
-    CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\|\\.|#|\\[|\\]|:|\\(|\\)|\\s)/g, '\\$1'));
+  window.CSS = window.CSS || {};
+  CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\|\\.|#|\\[|\\]|:|\\(|\\)|\\s)/g, '\\$1'));
 
-    // Simple toast
-    const toastEl = document.getElementById('toast');
-    function showToast(msg) {
-      toastEl.textContent = msg;
-      toastEl.classList.add('show');
-      setTimeout(() => toastEl.classList.remove('show'), 2200);
+  if (!localStorage.getItem(uidKey)) localStorage.setItem(uidKey, 'user-' + Math.random().toString(36).slice(2));
+  const USER_ID = localStorage.getItem(uidKey);
+  let CURRENT_WALLET = localStorage.getItem(walletKey) || '';
+
+  function fetchJSON(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({
+      'x-user-id': USER_ID,
+      'Content-Type': 'application/json'
+    }, opts.headers || {});
+    return fetch(url, opts).then(async r => {
+      const txt = await r.text().catch(()=> '');
+      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
+      try { return JSON.parse(txt); } catch { return txt; }
+    });
+  }
+
+  // UI helpers
+  function toast(msg, ms=2000){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=> t.classList.remove('show'), ms);
+  }
+  function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
+  function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+  function formatPrice(x){if(x===null||x===undefined||x==='')return'';var n=Number(x);if(!isFinite(n))return String(x);return(n>0?'+':'')+Math.round(n)}
+
+  // Wallet verify
+  async function verifyWallet(addr) {
+    return fetchJSON(API_BASE + '/wallet/verify', { method: 'POST', body: JSON.stringify({ address: addr }) });
+  }
+
+  // Leaderboard + my week
+  async function loadLeaderboard() {
+    const body = document.getElementById('leaderboardBody');
+    if (!body) return;
+    body.textContent = 'Loading...';
+    try {
+      const res = await fetchJSON(API_BASE + '/leaderboard/weekly');
+      body.innerHTML = (res.leaderboard || []).map(r =>
+        '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + Math.round(r.bankroll) + '</div>'
+      ).join('') || 'No players yet.';
+    } catch { body.textContent = 'Error loading leaderboard'; }
+  }
+  async function refreshMyWeek() {
+    if (!CURRENT_WALLET) return;
+    const j = await fetchJSON(API_BASE + '/bets/wallet?wallet=' + encodeURIComponent(CURRENT_WALLET));
+    const bankrollEl = document.getElementById('bankroll');
+    if (bankrollEl) bankrollEl.textContent = 'Bankroll: ' + Math.round(j.remainingBankroll);
+    const body = document.getElementById('myBetsBody');
+    if (body) {
+      body.innerHTML = (j.bets||[]).map(b => {
+        const snap = (b.snapshot && (b.snapshot.selectionA || b.snapshot.selectionB)) ? ` · @ ${escapeHtml(b.snapshot.selectionA || '')}/${escapeHtml(b.snapshot.selectionB || '')}` : '';
+        const pay = (b.payout != null) ? (' · Payout ' + b.payout) : '';
+        return `<div>#${escapeHtml(b.id || String(b.lineId))} · ${escapeHtml(b.side)} · Stake ${escapeHtml(b.stake)} · ${escapeHtml(b.status)}${pay}${snap}</div>`;
+      }).join('') || '<div class="muted">No bets yet.</div>';
     }
+  }
 
-    // User identity header for backend rate-limiting/session
-    if (!localStorage.getItem(uidKey)) localStorage.setItem(uidKey, 'user-' + Math.random().toString(36).slice(2));
-    const USER_ID = localStorage.getItem(uidKey);
-    let CURRENT_WALLET = localStorage.getItem(walletKey) || '';
+  // Lines loader with auto-sync
+  async function ensureLinesFor(sport){
+    // 1) try contests/open
+    try {
+      const r1 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+      if (r1 && Array.isArray(r1.data) && r1.data.some(c => c.line && c.line.id)) return r1.data;
+    } catch {}
 
-    function fetchJSON(url, opts) {
-      opts = opts || {};
-      opts.headers = Object.assign({
-        'x-user-id': USER_ID,
-        'Content-Type': 'application/json'
-      }, opts.headers || {});
-      return fetch(url, opts).then(async r => {
-        const ct = r.headers.get('content-type') || '';
-        if (!r.ok) {
-          const t = await r.text().catch(()=> '');
-          throw new Error(t || ('HTTP ' + r.status));
+    // 2) trigger a sync and re-check
+    try { await fetchJSON(`${API_BASE}/sync/odds?sport=${encodeURIComponent(sport)}`, { method:'POST' }); } catch {}
+    try {
+      const r2 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+      if (r2 && Array.isArray(r2.data) && r2.data.some(c => c.line && c.line.id)) return r2.data;
+    } catch {}
+
+    // 3) last resort: show ephemeral odds (no IDs) so UI isn't empty
+    try {
+      const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+      return Array.isArray(r3) ? r3 : (r3.data || r3.lines || []);
+    } catch { return []; }
+  }
+
+  function renderLines(target, items, sport){
+    if (!items || !items.length) { target.textContent = 'No lines available right now.'; return; }
+    let html = '';
+    const max = Math.min(items.length, 50);
+
+    for (let i=0;i<max;i++){
+      const c = items[i];
+      const L = (c && c.line) || c || {};
+      const a = L.selectionA || c?.bestLine?.selectionA || 'A';
+      const b = L.selectionB || c?.bestLine?.selectionB || 'B';
+      const pa = formatPrice(L.priceA ?? c?.bestLine?.priceA);
+      const pb = formatPrice(L.priceB ?? c?.bestLine?.priceB);
+      const ts = asTime(c.startsAt || c.start || c.commenceTime);
+      const lineId = L.id || L.lineId || c.lineId || c.id;
+      const contestId = c.id || c.contestId || L.contestId;
+
+      const missingId = !lineId || !contestId;
+      const message = missingId ? `<div class="muted">Syncing lines… tap Refresh.</div>` : '';
+
+      html += `
+        <div class="line-row">
+          <div class="teams">${escapeHtml(a)} vs ${escapeHtml(b)}</div>
+          <div class="prices">${escapeHtml(pa)} · ${escapeHtml(pb)}</div>
+          <div class="time">${ts}</div>
+          <div class="stake-row">
+            <input type="number" min="1" step="1" placeholder="Stake" class="stake-input" data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">
+            <button class="betA" ${missingId?'disabled':''} data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">Bet ${escapeHtml(a)}</button>
+            <button class="betB" ${missingId?'disabled':''} data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">Bet ${escapeHtml(b)}</button>
+          </div>
+          ${message}
+        </div>`;
+    }
+    target.innerHTML = html;
+
+    target.querySelectorAll('.betA, .betB').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        if (!CURRENT_WALLET) return alert('Verify wallet first');
+        const side = btn.classList.contains('betA') ? 'A' : 'B';
+        const lineId = btn.getAttribute('data-line');
+        const contestId = btn.getAttribute('data-contest');
+        if (!lineId || !contestId) { toast('Still syncing official lines… hit Refresh.'); return; }
+        const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId||'')}"]`);
+        const stake = Number(input && input.value ? input.value : '0');
+        if (!Number.isInteger(stake) || stake <= 0) return alert('Enter a valid integer stake');
+
+        try {
+          const j = await fetchJSON(API_BASE + '/bets/wallet', {
+            method: 'POST',
+            body: JSON.stringify({ wallet: CURRENT_WALLET, lineId, side, stake, contestId })
+          });
+          toast(`Bet ${side === 'A' ? 'A' : 'B'} · Stake ${stake} — placed`);
+          if (input) input.value = '';
+          await refreshMyWeek();
+        } catch (e) {
+          alert((e && e.message) || String(e));
         }
-        if (ct.includes('application/json')) return r.json();
-        return r.text();
       });
-    }
+    });
+  }
 
-    // Helpers
-    function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
-    function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-    function formatPrice(x){ if(x===null||x===undefined||x==='')return''; var n=Number(x); if(!isFinite(n))return String(x); return (n>0?'+':'')+Math.round(n) }
+  function setBusy(sport,busy){
+    const btn=document.querySelector('[data-action="refresh"][data-sport="'+sport+'"]');
+    if (!btn) return;
+    btn.disabled = !!busy;
+    btn.textContent = busy ? 'Loading…' : 'Refresh';
+  }
 
-    // API calls
-    async function verifyWallet(addr) {
-      return fetchJSON(API_BASE + '/wallet/verify', { method: 'POST', body: JSON.stringify({ address: addr }) });
-    }
-    async function loadMyWeek(wallet) {
-      return fetchJSON(API_BASE + '/bets/wallet?wallet=' + encodeURIComponent(wallet));
-    }
-    async function leaderboardWeekly() {
-      return fetchJSON(API_BASE + '/leaderboard/weekly');
-    }
-
-    // Render lines – strictly use DB line.id; disable buttons if missing
-    function renderLines(target, items, sport){
-      if (!items || !items.length) { target.textContent = 'No lines available right now.'; return; }
-      let html = '';
-      const max = Math.min(items.length, 50);
-
-      for (let i=0;i<max;i++){
-        const c = items[i];
-        const L = (c && c.line) ? c.line : {};
-        const contestId = c.id || c.contestId || null;
-        const lineId = L.id || L.lineId || null;
-
-        const a = L.selectionA || c?.bestLine?.selectionA || 'A';
-        const b = L.selectionB || c?.bestLine?.selectionB || 'B';
-        const pa = formatPrice(L.priceA ?? c?.bestLine?.priceA);
-        const pb = formatPrice(L.priceB ?? c?.bestLine?.priceB);
-        const ts = asTime(c.startsAt || c.start || c.commenceTime);
-
-        const disabled = !lineId ? 'disabled aria-disabled="true"' : '';
-        const hint = !lineId ? '<div class="muted">Syncing lines… tap Refresh.</div>' : '';
-
-        html += `
-          <div class="line-row">
-            <div class="teams">${escapeHtml(a)} vs ${escapeHtml(b)}</div>
-            <div class="meta"><span>${ts}</span><span>${escapeHtml(pa)} · ${escapeHtml(pb)}</span></div>
-
-            <div class="stake-row">
-              <input type="number" min="1" step="1" placeholder="Stake" class="stake-input"
-                     data-line="${lineId ? escapeHtml(String(lineId)) : ''}"
-                     data-contest="${contestId ? escapeHtml(String(contestId)) : ''}">
-              <button class="betA" data-line="${lineId ?? ''}" data-contest="${contestId ?? ''}" ${disabled}>Bet ${escapeHtml(a)}</button>
-              <button class="betB" data-line="${lineId ?? ''}" data-contest="${contestId ?? ''}" ${disabled}>Bet ${escapeHtml(b)}</button>
-            </div>
-            ${hint}
-          </div>`;
-      }
-
-      target.innerHTML = html;
-
-      target.querySelectorAll('.betA, .betB').forEach(btn=>{
-        btn.addEventListener('click', async ()=>{
-          if (!CURRENT_WALLET) { alert('Verify wallet first'); return; }
-
-          const lineId = btn.getAttribute('data-line');
-          const contestId = btn.getAttribute('data-contest');
-          if (!lineId) { alert('Lines are syncing. Tap Refresh and try again.'); return; }
-
-          const side = btn.classList.contains('betA') ? 'A' : 'B';
-          const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId)}"]`);
-          const stake = Number(input && input.value ? input.value : '0');
-          if (!Number.isInteger(stake) || stake <= 0) { alert('Enter a valid integer stake'); return; }
-
-          // Snapshot row for toast fallback
-          const row = btn.closest('.line-row');
-          const teamsEl = row ? row.querySelector('.teams') : null;
-          const pricesEl = row ? row.querySelector('.meta span:last-child') : null;
-          const names = teamsEl ? teamsEl.textContent.split(' vs ') : ['A','B'];
-          const pricePair = pricesEl ? pricesEl.textContent.trim() : '';
-          const [priceA, , priceB] = pricePair.split(' ');
-
-          try {
-            const j = await fetchJSON(API_BASE + '/bets/wallet', {
-              method: 'POST',
-              body: JSON.stringify({ wallet: CURRENT_WALLET, lineId, side, stake, contestId })
-            });
-
-            const took = j.took || {};
-            const selName = took.team || (side === 'A' ? names[0] : names[1]);
-            const selOdds = (took.odds != null) ? (took.odds > 0 ? `+${took.odds}` : `${took.odds}`) :
-                              (side === 'A' ? (priceA || '') : (priceB || ''));
-            showToast(`Bet ${selName}${selOdds ? ' ' + selOdds : ''} · Stake ${stake} — placed`);
-
-            if (input) input.value = '';
-            await refreshMyWeek();
-          } catch (e) {
-            alert((e && e.message) || String(e));
-          }
-        });
-      });
-    }
-
-    function setBusy(sport,busy){
-      const btn=document.querySelector('[data-action="refresh"][data-sport="'+sport+'"]');
-      if (!btn) return;
-      btn.disabled = !!busy;
-      btn.textContent = busy ? 'Loading…' : 'Refresh';
-    }
-
-    async function fetchLines(sport){
-      try {
-        const res = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
-        if (res && Array.isArray(res.data) && res.data.length) return res.data;
-      } catch (e) { /* fall through */ }
-      try {
-        const r2 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
-        return Array.isArray(r2) ? r2 : (r2.data || r2.lines || []);
-      } catch (e) {
-        return { __error: e };
-      }
-    }
-
-    async function loadSport(sport){
-      const box=document.querySelector('[data-sport="'+sport+'"] .lines');
-      if(!box) return;
-      setBusy(sport,true); box.textContent='Loading...';
-      const res = await fetchLines(sport);
-      if (res && res.__error) {
-        box.innerHTML = 'Failed to load lines.' + '<div class="muted">source: '+escapeHtml(res.__error.message || 'error')+'</div>';
-      } else {
-        renderLines(box, res, sport);
-      }
+  async function loadSport(sport){
+    const box = document.querySelector('[data-sport="'+sport+'"] .lines');
+    if (!box) return;
+    setBusy(sport,true); box.textContent = 'Loading...';
+    try {
+      const lines = await ensureLinesFor(sport);
+      renderLines(box, lines, sport);
+    } catch (e) {
+      console.error(e);
+      box.textContent = 'Failed to load lines.';
+    } finally {
       setBusy(sport,false);
     }
+  }
 
-    function bindRefresh(){
-      document.querySelectorAll('[data-action="refresh"]').forEach(btn=>{
-        btn.addEventListener('click', ()=> loadSport(btn.getAttribute('data-sport') || 'NFL'));
-      });
-      document.getElementById('refreshBoard')?.addEventListener('click', loadLeaderboard);
-      document.getElementById('refreshMine')?.addEventListener('click', refreshMyWeek);
-    }
-
-    async function loadLeaderboard() {
-      const body = document.getElementById('leaderboardBody');
-      if (!body) return;
-      body.textContent = 'Loading...';
-      try {
-        const res = await leaderboardWeekly();
-        body.innerHTML = (res.leaderboard || []).map(r =>
-          '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + Math.round(r.bankroll) + '</div>'
-        ).join('') || 'No players yet.';
-      } catch {
-        body.textContent = 'Error loading leaderboard';
-      }
-    }
-
-    async function refreshMyWeek() {
-      if (!CURRENT_WALLET) return;
-      try {
-        const j = await loadMyWeek(CURRENT_WALLET);
-        const bankrollEl = document.getElementById('bankroll');
-        if (bankrollEl) bankrollEl.textContent = 'Bankroll: ' + Math.round(j.remainingBankroll);
-        const body = document.getElementById('myBetsBody');
-        if (body) {
-          body.innerHTML = (j.bets||[]).map(b => {
-            const pay = (b.payout != null) ? (' · Payout ' + b.payout) : '';
-            return `<div>#${b.id || b.lineId} · ${b.side} · Stake ${b.stake} · ${b.status}${pay}</div>`;
-          }).join('') || '<div class="muted">No bets yet.</div>';
-        }
-      } catch { /* ignore */ }
-    }
-
-    // Boot
-    document.addEventListener('DOMContentLoaded', async ()=>{
-      const verifyBtn = document.getElementById('verifyBtn');
-      const walletInput = document.getElementById('walletAddr');
-      const walletStatus = document.getElementById('walletStatus');
-
-      if (CURRENT_WALLET && walletInput) walletInput.value = CURRENT_WALLET;
-
-      if (verifyBtn) {
-        verifyBtn.addEventListener('click', async ()=>{
-          const addr = (walletInput && walletInput.value ? walletInput.value : '').trim();
-          if (!addr) { alert('Enter wallet address'); return; }
-          verifyBtn.disabled = true;
-          walletStatus.textContent = 'Checking balance...';
-          try {
-            const res = await verifyWallet(addr);
-            CURRENT_WALLET = addr;
-            localStorage.setItem(walletKey, addr);
-            if (res.verified) {
-              walletStatus.innerHTML = '✅ Verified! $500 weekly bankroll ready.';
-              document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
-              document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
-              await Promise.all([loadLeaderboard(), refreshMyWeek()]);
-              await Promise.all([loadSport('NFL'), loadSport('NBA')]); // ensure buttons use real line ids
-            } else {
-              walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
-            }
-          } catch (e) {
-            walletStatus.textContent = 'Error: ' + (e.message || e);
-          } finally {
-            verifyBtn.disabled = false;
-          }
-        });
-      }
-
-      bindRefresh();
-      loadSport('NFL');
-      loadSport('NBA');
-
-      if (CURRENT_WALLET) {
-        document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
-        document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
-        await Promise.all([loadLeaderboard(), refreshMyWeek()]);
-      }
+  function bindRefresh(){
+    document.querySelectorAll('[data-action="refresh"]').forEach(btn=>{
+      btn.addEventListener('click', ()=> loadSport(btn.getAttribute('data-sport') || 'NFL'));
     });
-  })();
+  }
+
+  // Boot
+  document.addEventListener('DOMContentLoaded', async ()=>{
+    const verifyBtn = document.getElementById('verifyBtn');
+    const walletInput = document.getElementById('walletAddr');
+    const walletStatus = document.getElementById('walletStatus');
+
+    if (CURRENT_WALLET && walletInput) walletInput.value = CURRENT_WALLET;
+
+    if (verifyBtn) {
+      verifyBtn.addEventListener('click', async ()=>{
+        const addr = (walletInput && walletInput.value ? walletInput.value : '').trim();
+        if (!addr) return alert('Enter wallet address');
+        verifyBtn.disabled = true;
+        walletStatus.textContent = 'Checking balance...';
+        try {
+          const res = await verifyWallet(addr);
+          CURRENT_WALLET = addr;
+          localStorage.setItem(walletKey, addr);
+          if (res.verified) {
+            walletStatus.innerHTML = '✅ Verified! $500 weekly bankroll ready.';
+            document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
+            document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
+            await Promise.all([loadLeaderboard(), refreshMyWeek()]);
+            await Promise.all([loadSport('NFL'), loadSport('NBA')]);
+          } else {
+            walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
+          }
+        } catch (e) {
+          walletStatus.textContent = 'Error: ' + (e.message || e);
+        } finally {
+          verifyBtn.disabled = false;
+        }
+      });
+    }
+
+    bindRefresh();
+    loadSport('NFL');
+    loadSport('NBA');
+
+    document.getElementById('refreshBoard')?.addEventListener('click', loadLeaderboard);
+    document.getElementById('refreshMine')?.addEventListener('click', refreshMyWeek);
+
+    if (CURRENT_WALLET) {
+      document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
+      document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
+      await Promise.all([loadLeaderboard(), refreshMyWeek()]);
+    }
+  });
   </script>
 </body>
 </html>
