@@ -3,6 +3,10 @@ const API_BASE = 'https://thirst-bet-backend.onrender.com';
 const uidKey = 'thirst_uid';
 const walletKey = 'thirst_wallet';
 
+// Polyfill for CSS.escape (older Safari)
+window.CSS = window.CSS || {};
+CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\|\.|#|\[|\]|:|\(|\)|\s)/g, '\\$1'));
+
 if (!localStorage.getItem(uidKey)) localStorage.setItem(uidKey, 'user-' + Math.random().toString(36).slice(2));
 const USER_ID = localStorage.getItem(uidKey);
 let CURRENT_WALLET = localStorage.getItem(walletKey) || '';
@@ -94,6 +98,7 @@ function renderLines(target,items, sport){
   }
   target.innerHTML=html;
 
+  // attach events
   target.querySelectorAll('.betA, .betB').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if (!CURRENT_WALLET) return alert('Verify wallet first');
@@ -101,7 +106,7 @@ function renderLines(target,items, sport){
       const lineId = btn.getAttribute('data-line');
       const contestId = btn.getAttribute('data-contest');
       const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId||'')}"]`);
-      const stake = Number(input?.value || '0');
+      const stake = Number(input && input.value ? input.value : '0');
       if (!Number.isInteger(stake) || stake <= 0) return alert('Enter a valid integer stake');
 
       try {
@@ -156,7 +161,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
 
   if (verifyBtn) {
     verifyBtn.addEventListener('click', async ()=>{
-      const addr = (walletInput?.value || '').trim();
+      const addr = (walletInput && walletInput.value ? walletInput.value : '').trim();
       if (!addr) return alert('Enter wallet address');
       verifyBtn.disabled = true;
       walletStatus.textContent = 'Checking balance...';
@@ -166,8 +171,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         localStorage.setItem(walletKey, addr);
         if (res.verified) {
           walletStatus.innerHTML = '✅ Verified! $500 weekly bankroll ready.';
-          document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
-          document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
+          const lb = document.getElementById('leaderboardCard'); if (lb) lb.style.display='block';
+          const mb = document.getElementById('myBetsCard'); if (mb) mb.style.display='block';
           await Promise.all([loadLeaderboard(), refreshMyWeek()]);
         } else {
           walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
@@ -183,12 +188,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindRefresh();
   loadSport('NFL'); loadSport('NBA');
 
-  document.getElementById('refreshBoard')?.addEventListener('click', loadLeaderboard);
-  document.getElementById('refreshMine')?.addEventListener('click', refreshMyWeek);
+  const rb = document.getElementById('refreshBoard'); if (rb) rb.addEventListener('click', loadLeaderboard);
+  const rm = document.getElementById('refreshMine'); if (rm) rm.addEventListener('click', refreshMyWeek);
 
   if (CURRENT_WALLET) {
-    document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
-    document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
+    const lb = document.getElementById('leaderboardCard'); if (lb) lb.style.display='block';
+    const mb = document.getElementById('myBetsCard'); if (mb) mb.style.display='block';
     await Promise.all([loadLeaderboard(), refreshMyWeek()]);
   }
 });
