@@ -8,7 +8,8 @@
     body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:#0b1620; color:#e9f1ff; }
     .wrap { max-width: 720px; margin: 32px auto; padding: 0 16px; }
     .h1 { font-size: 34px; font-weight: 800; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-    .sub { color:#98a6bd; margin-bottom:20px; }
+    .sub { color:#98a6bd; margin-bottom:6px; }
+    .ver { color:#667a96; font-size:12px; margin-bottom:20px; }
     .card { background:#0f1e2d; border-radius:16px; padding:16px; margin:16px 0; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
     .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
     .card-head div { font-weight:700; letter-spacing:0.5px; }
@@ -28,13 +29,13 @@
     .stake-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
     .stake-input { width:96px; background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:6px; color:#e9f1ff; }
     .muted { color:#9ab0c9; font-size:14px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="h1">💧 Thirst Bet</div>
     <div class="sub">Auto-loaded live lines (NFL & NBA).</div>
+    <div class="ver">build: 2025-11-15-05</div>
 
     <!-- Wallet Verification -->
     <div class="wallet-box">
@@ -82,7 +83,7 @@
     </div>
   </div>
 
-  <!-- Load the external app script (cache-busted) -->
-  <script src="/app.v6.js?v=2025-11-15-03"></script>
+  <!-- Only this script; NO inline script block -->
+  <script src="/app.v6.js?v=2025-11-15-05"></script>
 </body>
 </html>
