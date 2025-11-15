@@ -35,7 +35,7 @@
   <div class="wrap">
     <div class="h1">💧 Thirst Bet</div>
     <div class="sub">Auto-loaded live lines (NFL & NBA).</div>
-    <div class="ver">build: inline-2025-11-15-12c</div>
+    <div class="ver">build: inline-2025-11-15-13</div>
 
     <div class="wallet-box">
       <div><strong>Verify Wallet</strong></div>
@@ -111,7 +111,15 @@
     const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
     const asTime = (s)=>{ try{ return new Date(s).toLocaleString(); } catch { return ''; } };
     const escapeHtml = (str)=> String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-    const fmt = (x)=> (x===null||x===undefined||x==='') ? '' : ((Number(x)>0?'+':'')+Math.round(Number(x)));
+    function fmtAmerican(v){
+      const n = Number(v);
+      if (!Number.isFinite(n)) return '';
+      if (n > 0 && n < 10) { // decimal fallback
+        const am = n >= 2 ? Math.round((n-1)*100) : Math.round(-100/(n-1));
+        return (am>0?'+':'') + am;
+      }
+      return (n>0?'+':'') + Math.round(n);
+    }
 
     async function verifyWallet(addr) {
       return fetchJSON(API_BASE + '/wallet/verify', { method: 'POST', body: JSON.stringify({ address: addr }) });
@@ -128,43 +136,31 @@
       }).join('') || '<div class="muted">No bets yet.</div>';
     }
 
-    // Fallback loader: contests/open -> sync -> contests/open -> odds
-    async function loadLinesWithFallback(sport) {
+    async function forceDbLines(sport) {
+      // 1) Try open contests
       try {
-        const r1 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
-        const d1 = Array.isArray(r1?.data) ? r1.data : [];
-        if (d1.length) return { data: d1, source: '/contests/open' };
-      } catch (e) {
-        if (e && e.status !== 403) console.warn('open failed', e);
-        if (e && e.status === 403) {
-          // still show public odds if wallet not verified
-          try {
-            const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
-            const d3 = Array.isArray(r3) ? r3 : (r3.data || []);
-            return { data: d3, source: '/odds (unauth fallback)' };
-          } catch (e3) {
-            return { data: [], source: `error ${e3.status || ''}`.trim() };
-          }
-        }
-      }
+        const r = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+        if (Array.isArray(r?.data) && r.data.length) return { data: r.data, source: '/contests/open' };
+      } catch {}
 
-      try { await fetchJSON(`${API_BASE}/sync/odds?sport=${encodeURIComponent(sport)}`, { method: 'POST' }); } catch(_){}
+      // 2) Trigger sync (creates contests & lines with AMERICAN odds), wait briefly
+      try { await fetchJSON(`${API_BASE}/sync/odds?sport=${encodeURIComponent(sport)}`, { method: 'POST' }); } catch {}
       await sleep(1200);
+
+      // 3) Read again (should now have DB-backed lines)
       try {
         const r2 = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
-        const d2 = Array.isArray(r2?.data) ? r2.data : [];
-        if (d2.length) return { data: d2, source: '/contests/open (after sync)' };
-      } catch (e2) {
-        // last resort: public odds
-        try {
-          const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
-          const d3 = Array.isArray(r3) ? r3 : (r3.data || []);
-          return { data: d3, source: '/odds' };
-        } catch (e3) {
-          return { data: [], source: `error ${e3.status || ''}`.trim() };
-        }
+        if (Array.isArray(r2?.data) && r2.data.length) return { data: r2.data, source: '/contests/open (after sync)' };
+      } catch {}
+
+      // 4) Last resort: public odds; buttons disabled (no DB line.id)
+      try {
+        const r3 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+        const d = Array.isArray(r3) ? r3 : (r3.data || []);
+        return { data: d, source: '/odds (fallback)' };
+      } catch (e) {
+        return { data: [], source: `error ${e.status || ''}`.trim() };
       }
-      return { data: [], source: 'none' };
     }
 
     function pickLine(c){
@@ -175,7 +171,6 @@
       if (c.bestLine) {
         return { a:c.bestLine.selectionA||'A', b:c.bestLine.selectionB||'B', pa:c.bestLine.priceA, pb:c.bestLine.priceB, ts:c.startsAt||c.commenceTime, id:c.bestLine.id, cid:c.id };
       }
-      // very raw odds shape
       if (c.selectionA || c.selectionB || c.priceA!==undefined || c.priceB!==undefined) {
         return { a:c.selectionA||'A', b:c.selectionB||'B', pa:c.priceA, pb:c.priceB, ts:c.startsAt||c.commenceTime, id:c.id, cid:c.contestId };
       }
@@ -192,11 +187,11 @@
         const c = items[i];
         const L = pickLine(c) || { a:'A', b:'B', pa:'', pb:'', ts:'', id:null, cid:null };
         const disabled = (!L.id || !L.cid) ? 'disabled' : '';
-        const hint = (!L.id || !L.cid) ? ' (verify wallet to bet)' : '';
+        const hint = (!L.id || !L.cid) ? ' (syncing...)' : '';
         html += `
           <div class="line-row">
             <div class="teams">${escapeHtml(L.a)} vs ${escapeHtml(L.b)}</div>
-            <div class="prices">${escapeHtml(fmt(L.pa))} · ${escapeHtml(fmt(L.pb))}</div>
+            <div class="prices">${escapeHtml(fmtAmerican(L.pa))} · ${escapeHtml(fmtAmerican(L.pb))}</div>
             <div class="time">${asTime(L.ts)}</div>
             <div class="stake-row">
               <input type="number" min="1" step="1" placeholder="Stake" class="stake-input"
@@ -242,7 +237,7 @@
       if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
       box.textContent = 'Loading...';
       try {
-        const { data, source } = await loadLinesWithFallback(sport);
+        const { data, source } = await forceDbLines(sport);
         renderLines(box, data, sport, source);
       } catch {
         box.textContent = 'Failed to load lines.';
