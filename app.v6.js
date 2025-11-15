@@ -1,4 +1,4 @@
-// public/app.v6.js
+// public/app.v6.js  (build: 2025-11-15-05)
 const API_BASE = 'https://thirst-bet-backend.onrender.com';
 const uidKey = 'thirst_uid';
 const walletKey = 'thirst_wallet';
@@ -17,23 +17,21 @@ function fetchJSON(url, opts) {
     'x-user-id': USER_ID,
     'Content-Type': 'application/json'
   }, opts.headers || {});
-  return fetch(url, opts).then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+  return fetch(url, opts).then(async r => {
+    if (!r.ok) {
+      const t = await r.text().catch(()=> '');
+      throw new Error(t || ('HTTP ' + r.status));
+    }
     return r.json();
   });
 }
 
-function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
-function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function formatPrice(x){if(x===null||x===undefined||x==='')return'';var n=Number(x);if(!isFinite(n))return String(x);return(n>0?'+':'')+Math.round(n)}
-
 // Wallet verify
 async function verifyWallet(addr) {
-  const res = await fetchJSON(API_BASE + '/wallet/verify', {
+  return fetchJSON(API_BASE + '/wallet/verify', {
     method: 'POST',
     body: JSON.stringify({ address: addr })
   });
-  return res;
 }
 
 // Leaderboard weekly
@@ -43,18 +41,15 @@ async function loadLeaderboard() {
   body.textContent = 'Loading...';
   try {
     const res = await fetchJSON(API_BASE + '/leaderboard/weekly');
-    if (res.leaderboard && res.leaderboard.length) {
-      body.innerHTML = res.leaderboard.map(r =>
-        '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + Math.round(r.bankroll) + '</div>'
-      ).join('');
-    } else {
-      body.textContent = 'No players yet.';
-    }
-  } catch (e) {
+    body.innerHTML = (res.leaderboard || []).map(r =>
+      '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + Math.round(r.bankroll) + '</div>'
+    ).join('') || 'No players yet.';
+  } catch {
     body.textContent = 'Error loading leaderboard';
   }
 }
 
+// My week (bankroll + bets)
 async function refreshMyWeek() {
   if (!CURRENT_WALLET) return;
   const j = await fetchJSON(API_BASE + '/bets/wallet?wallet=' + encodeURIComponent(CURRENT_WALLET));
@@ -62,29 +57,43 @@ async function refreshMyWeek() {
   if (bankrollEl) bankrollEl.textContent = 'Bankroll: ' + Math.round(j.remainingBankroll);
   const body = document.getElementById('myBetsBody');
   if (!body) return;
-  if (!j.bets || !j.bets.length) { body.innerHTML = '<div class="muted">No bets yet.</div>'; return; }
-  body.innerHTML = j.bets.map((b) => {
-    const side = (b.side === 'A' || b.side === 'B') ? b.side : (b.side?.toString?.() || '');
+  body.innerHTML = (j.bets||[]).map(b => {
     const pay = (b.payout != null) ? (' · Payout ' + b.payout) : '';
-    return `<div>#${b.lineId} · ${side} · Stake ${b.stake} · ${b.status}${pay}</div>`;
-  }).join('');
+    return `<div>#${b.lineId} · ${b.side} · Stake ${b.stake} · ${b.status}${pay}</div>`;
+  }).join('') || '<div class="muted">No bets yet.</div>';
 }
 
-function renderLines(target,items, sport){
-  if(!items||!items.length){target.textContent='No lines available right now.';return}
-  let html='';
-  const max=Math.min(items.length,50);
-  for(let i=0;i<max;i++){
-    const c=items[i];
-    const L=(c&&c.line)||{};
-    const a=L.selectionA||'A';
-    const b=L.selectionB||'B';
-    const pa=formatPrice(L.priceA);
-    const pb=formatPrice(L.priceB);
-    const ts=asTime(c.startsAt);
-    const lineId=L.id||c.lineId||c.id;
-    const contestId=c.id || c.contestId;
-    html+=`
+// Helpers
+function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
+function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function formatPrice(x){if(x===null||x===undefined||x==='')return'';var n=Number(x);if(!isFinite(n))return String(x);return(n>0?'+':'')+Math.round(n)}
+
+// Lines
+async function fetchLines(sport){
+  try {
+    const res = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+    if (res && Array.isArray(res.data) && res.data.length) return res.data;
+  } catch {}
+  const r2 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+  return Array.isArray(r2) ? r2 : (r2.data || r2.lines || []);
+}
+
+function renderLines(target, items, sport){
+  if (!items || !items.length) { target.textContent = 'No lines available right now.'; return; }
+  let html = '';
+  const max = Math.min(items.length, 50);
+  for (let i=0;i<max;i++){
+    const c = items[i];
+    const L = (c && c.line) || c || {};
+    const a = L.selectionA || c?.bestLine?.selectionA || 'A';
+    const b = L.selectionB || c?.bestLine?.selectionB || 'B';
+    const pa = formatPrice(L.priceA ?? c?.bestLine?.priceA);
+    const pb = formatPrice(L.priceB ?? c?.bestLine?.priceB);
+    const ts = asTime(c.startsAt || c.start || c.commenceTime);
+    const lineId = L.id || L.lineId || c.lineId || c.id;
+    const contestId = c.id || c.contestId || L.contestId;
+
+    html += `
       <div class="line-row">
         <div class="teams">${escapeHtml(a)} vs ${escapeHtml(b)}</div>
         <div class="prices">${escapeHtml(pa)} · ${escapeHtml(pb)}</div>
@@ -96,9 +105,8 @@ function renderLines(target,items, sport){
         </div>
       </div>`;
   }
-  target.innerHTML=html;
+  target.innerHTML = html;
 
-  // attach events
   target.querySelectorAll('.betA, .betB').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if (!CURRENT_WALLET) return alert('Verify wallet first');
@@ -127,31 +135,31 @@ function renderLines(target,items, sport){
 function setBusy(sport,busy){
   const btn=document.querySelector('[data-action="refresh"][data-sport="'+sport+'"]');
   if (!btn) return;
-  btn.disabled=!!busy;
-  btn.textContent=busy?'Loading…':'Refresh';
+  btn.disabled = !!busy;
+  btn.textContent = busy ? 'Loading…' : 'Refresh';
 }
 
 async function loadSport(sport){
-  const box=document.querySelector('[data-sport="'+sport+'"] .lines');
-  if(!box) return;
-  setBusy(sport,true); box.textContent='Loading...';
-  const url = API_BASE + '/contests/open?sport=' + encodeURIComponent(sport);
+  const box = document.querySelector('[data-sport="'+sport+'"] .lines');
+  if (!box) return;
+  setBusy(sport,true); box.textContent = 'Loading...';
   try {
-    const res = await fetchJSON(url);
-    renderLines(box, (res&&res.data)||[], sport);
+    const lines = await fetchLines(sport);
+    renderLines(box, lines, sport);
   } catch {
-    box.textContent='Failed to load lines.';
+    box.textContent = 'Failed to load lines.';
   } finally {
     setBusy(sport,false);
   }
 }
 
 function bindRefresh(){
-  document.querySelectorAll('[data-action="refresh"]').forEach((btn)=>{
+  document.querySelectorAll('[data-action="refresh"]').forEach(btn=>{
     btn.addEventListener('click', ()=> loadSport(btn.getAttribute('data-sport') || 'NFL'));
   });
 }
 
+// Boot
 document.addEventListener('DOMContentLoaded', async ()=>{
   const verifyBtn = document.getElementById('verifyBtn');
   const walletInput = document.getElementById('walletAddr');
@@ -171,9 +179,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
         localStorage.setItem(walletKey, addr);
         if (res.verified) {
           walletStatus.innerHTML = '✅ Verified! $500 weekly bankroll ready.';
-          const lb = document.getElementById('leaderboardCard'); if (lb) lb.style.display='block';
-          const mb = document.getElementById('myBetsCard'); if (mb) mb.style.display='block';
+          document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
+          document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
           await Promise.all([loadLeaderboard(), refreshMyWeek()]);
+          await Promise.all([loadSport('NFL'), loadSport('NBA')]); // reload with buttons
         } else {
           walletStatus.textContent = '❌ Needs at least ' + res.required + ' $THIRST tokens.';
         }
@@ -188,12 +197,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   bindRefresh();
   loadSport('NFL'); loadSport('NBA');
 
-  const rb = document.getElementById('refreshBoard'); if (rb) rb.addEventListener('click', loadLeaderboard);
-  const rm = document.getElementById('refreshMine'); if (rm) rm.addEventListener('click', refreshMyWeek);
+  document.getElementById('refreshBoard')?.addEventListener('click', loadLeaderboard);
+  document.getElementById('refreshMine')?.addEventListener('click', refreshMyWeek);
 
   if (CURRENT_WALLET) {
-    const lb = document.getElementById('leaderboardCard'); if (lb) lb.style.display='block';
-    const mb = document.getElementById('myBetsCard'); if (mb) mb.style.display='block';
+    document.getElementById('leaderboardCard')?.setAttribute('style','display:block;');
+    document.getElementById('myBetsCard')?.setAttribute('style','display:block;');
     await Promise.all([loadLeaderboard(), refreshMyWeek()]);
   }
 });
