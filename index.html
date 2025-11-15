@@ -17,29 +17,30 @@
     button[disabled]{ opacity:.5; cursor:not-allowed; }
     button:active { transform: translateY(1px); }
     .lines { color:#c3cee3; min-height:24px; }
-    .line-row { display:grid; grid-template-columns: 1fr auto; gap:10px; padding:12px 0; border-top:1px solid rgba(255,255,255,0.06); }
+    .line-row { display:grid; grid-template-columns: 1fr auto; gap:10px; padding:10px 0; border-top:1px solid rgba(255,255,255,0.06); }
     .line-row:first-child { border-top:0; }
-    .teams { font-weight:700; font-size:18px; }
+    .teams { font-weight:600; }
     .prices, .time { color:#9ab0c9; font-size:14px; }
     .time { grid-column: 1 / -1; }
     .wallet-box { background:#102437; border-radius:12px; padding:12px 16px; margin-bottom:20px; display:flex; flex-direction:column; gap:8px; }
     .wallet-box input { background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:8px; color:#e9f1ff; width:100%; }
     .leaderboard { margin-top:20px; font-size:14px; }
     .leaderboard div { padding:4px 0; border-bottom:1px solid rgba(255,255,255,0.05); }
-    .stake-row { display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+    .stake-row { display:flex; gap:8px; align-items:center; margin-top:6px; }
     .stake-input { width:96px; background:#0b1620; border:1px solid #22344d; border-radius:8px; padding:6px; color:#e9f1ff; }
     .muted { color:#9ab0c9; font-size:14px; }
-    .toast { position: fixed; left: 16px; right: 16px; bottom: 20px; background:#102437; border:1px solid #1d3552; border-radius:12px; padding:12px 14px; font-weight:600; box-shadow:0 10px 30px rgba(0,0,0,.4); opacity:0; transform: translateY(8px); transition: all .25s ease; z-index:9999; }
-    .toast.show { opacity:1; transform: translateY(0); }
+    /* toast */
+    .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(10px); background:#14263a; border:1px solid #234; color:#dff; padding:10px 14px; border-radius:12px; box-shadow:0 8px 28px rgba(0,0,0,.4); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; font-size:14px; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="h1">💧 Thirst Bet</div>
     <div class="sub">Auto-loaded live lines (NFL & NBA).</div>
-    <div class="ver">build: inline-2025-11-15-16</div>
+    <div class="ver">build: inline-2025-11-15-16f</div>
 
-    <!-- Wallet Verification -->
+    <!-- Wallet -->
     <div class="wallet-box">
       <div><strong>Verify Wallet</strong></div>
       <input id="walletAddr" placeholder="Enter your Solana wallet address" />
@@ -48,7 +49,7 @@
       <div id="bankroll" class="muted">Bankroll: —</div>
     </div>
 
-    <!-- Leaderboard (weekly) -->
+    <!-- Leaderboard -->
     <div class="card" id="leaderboardCard" style="display:none;">
       <div class="card-head">
         <div>Leaderboard (This Week)</div>
@@ -93,13 +94,16 @@
   const uidKey = 'thirst_uid';
   const walletKey = 'thirst_wallet';
 
+  // Polyfill CSS.escape for older Safari
   window.CSS = window.CSS || {};
-  CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\|\\.|#|\\[|\\]|:|\\(|\\)|\\s)/g, '\\$1'));
+  CSS.escape = CSS.escape || (s => String(s).replace(/("|'|\\\\|\\\\.|#|\\[|\\]|:|\\(|\\)|\\s)/g, '\\\\$1'));
 
+  // Light user id for rate limiting
   if (!localStorage.getItem(uidKey)) localStorage.setItem(uidKey, 'user-' + Math.random().toString(36).slice(2));
   const USER_ID = localStorage.getItem(uidKey);
   let CURRENT_WALLET = localStorage.getItem(walletKey) || '';
 
+  // Fetch helper
   function fetchJSON(url, opts) {
     opts = opts || {};
     opts.headers = Object.assign({
@@ -107,29 +111,29 @@
       'Content-Type': 'application/json'
     }, opts.headers || {});
     return fetch(url, opts).then(async r => {
-      const text = await r.text();
-      let data = null;
-      try { data = text ? JSON.parse(text) : {}; } catch { /* plain text */ }
-      if (!r.ok) {
-        const msg = (data && (data.error || data.message)) || text || ('HTTP ' + r.status);
-        throw new Error(msg);
-      }
-      return data;
+      const txt = await r.text().catch(()=> '');
+      if (!r.ok) throw new Error(txt || ('HTTP ' + r.status));
+      try { return JSON.parse(txt); } catch { return txt; }
     });
   }
 
-  // Helpers
+  // UI helpers
+  function toast(msg, ms=2200){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=> t.classList.remove('show'), ms);
+  }
   function asTime(s){try{return new Date(s).toLocaleString()}catch(_){return''}}
   function escapeHtml(str){return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
   function formatPrice(x){if(x===null||x===undefined||x==='')return'';var n=Number(x);if(!isFinite(n))return String(x);return(n>0?'+':'')+Math.round(n)}
-  function showToast(msg){const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 2200);}
 
   // Wallet verify
   async function verifyWallet(addr) {
     return fetchJSON(API_BASE + '/wallet/verify', { method: 'POST', body: JSON.stringify({ address: addr }) });
   }
 
-  // Leaderboard weekly
+  // Leaderboard + my week
   async function loadLeaderboard() {
     const body = document.getElementById('leaderboardBody');
     if (!body) return;
@@ -137,14 +141,11 @@
     try {
       const res = await fetchJSON(API_BASE + '/leaderboard/weekly');
       body.innerHTML = (res.leaderboard || []).map(r =>
-        '<div>#' + r.rank + ' ' + (r.name || r.userId?.slice(0,8) || 'user') + ' — $' + Math.round(r.bankroll) + '</div>'
+        '<div>#' + r.rank + ' ' + (r.name || r.userId.slice(0,5)) + ' — $' + Math.round(r.bankroll) + '</div>'
       ).join('') || 'No players yet.';
-    } catch {
-      body.textContent = 'Error loading leaderboard';
-    }
+    } catch { body.textContent = 'Error loading leaderboard'; }
   }
 
-  // My week (bankroll + bets)
   async function refreshMyWeek() {
     if (!CURRENT_WALLET) return;
     const j = await fetchJSON(API_BASE + '/bets/wallet?wallet=' + encodeURIComponent(CURRENT_WALLET));
@@ -153,124 +154,146 @@
     const body = document.getElementById('myBetsBody');
     if (body) {
       body.innerHTML = (j.bets||[]).map(b => {
-        const snap = [b.selectionAtBet || b.side, b.priceAtBet != null ? formatPrice(b.priceAtBet) : ''].filter(Boolean).join(' ');
-        const opp = b.matchup || b.contestTitle || '';
+        const snap = (b.snapshot && (b.snapshot.selectionA || b.snapshot.selectionB))
+          ? ` · ${escapeHtml(b.snapshot.selectionA||'')} / ${escapeHtml(b.snapshot.selectionB||'')} @ ${formatPrice(b.snapshot.priceA)} · ${formatPrice(b.snapshot.priceB)}`
+          : '';
         const pay = (b.payout != null) ? (' · Payout ' + b.payout) : '';
-        return `<div>${escapeHtml(opp)} · ${escapeHtml(snap)} · Stake ${b.stake} · ${escapeHtml(b.status)}${pay}</div>`;
+        return `<div>#${escapeHtml(b.id || String(b.lineId))} · ${escapeHtml(b.side)} · Stake ${escapeHtml(b.stake)} · ${escapeHtml(b.status)}${pay}${snap}</div>`;
       }).join('') || '<div class="muted">No bets yet.</div>';
     }
   }
 
-  // Lines
-  async function fetchLines(sport){
+  // Kick background sync for both sports (non-blocking)
+  async function kickoffSync() {
+    try { await fetchJSON(`${API_BASE}/sync/odds?sport=NFL`, { method:'POST' }); } catch {}
+    try { await fetchJSON(`${API_BASE}/sync/odds?sport=NBA`, { method:'POST' }); } catch {}
+  }
+
+  // Get contests with real line IDs (returns [] if none)
+  async function getContestsWithLines(sport){
     try {
-      // Prefer contests/open so we get contestId + bestLine with DB IDs
-      const res = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
-      if (res && Array.isArray(res.data) && res.data.length) return res.data;
-    } catch {}
-    // Fallback: raw odds proxy
-    const r2 = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
-    return Array.isArray(r2) ? r2 : (r2.data || r2.lines || []);
+      const r = await fetchJSON(`${API_BASE}/contests/open?sport=${encodeURIComponent(sport)}`);
+      if (!r || !Array.isArray(r.data)) return [];
+      // keep only contests that include a DB line with an id
+      return r.data.filter(c => (c.line && (c.line.id || c.line.lineId)));
+    } catch { return []; }
   }
 
-  // Ensure we ALWAYS take the nested line object for IDs
-  function getLineObject(item){
-    return item?.bestLine || item?.line || item?.Line || null;
+  // Fallback live odds (no betting when used)
+  async function getLiveOdds(sport){
+    try {
+      const r = await fetchJSON(`${API_BASE}/odds?sport=${encodeURIComponent(sport)}`);
+      return Array.isArray(r) ? r : (r.data || r.lines || []);
+    } catch { return []; }
   }
 
-  function renderLines(target, items, sport){
+  // Load lines with auto-resync / retries while showing live odds immediately
+  async function loadSport(sport){
+    const box = document.querySelector(`[data-sport="${sport}"] .lines`);
+    const btn = document.querySelector(`[data-action="refresh"][data-sport="${sport}"]`);
+    if (!box) return;
+
+    function setBusy(b){ if (btn){ btn.disabled=!!b; btn.textContent=b?'Loading…':'Refresh'; } }
+    setBusy(true); box.textContent='Loading...';
+
+    // try DB contests first
+    let contests = await getContestsWithLines(sport);
+
+    // while there are zero DB contests, show live odds (disabled buttons) and keep trying
+    if (!contests.length) {
+      const live = await getLiveOdds(sport);
+      renderLines(box, live, sport, /*origin=*/'ephemeral');
+      // start a short resync + poll loop (bounded)
+      let tries = 0;
+      const trySync = async () => {
+        tries++;
+        try { await fetchJSON(`${API_BASE}/sync/odds?sport=${encodeURIComponent(sport)}`, { method:'POST' }); } catch {}
+        const again = await getContestsWithLines(sport);
+        if (again.length) {
+          renderLines(box, again, sport, /*origin=*/'db');
+        } else if (tries < 6) {
+          setTimeout(trySync, 1200);
+        } else {
+          // leave live odds; user can press Refresh later
+        }
+      };
+      trySync();
+    } else {
+      renderLines(box, contests, sport, /*origin=*/'db');
+    }
+
+    setBusy(false);
+  }
+
+  function renderLines(target, items, sport, origin){
     if (!items || !items.length) { target.textContent = 'No lines available right now.'; return; }
     let html = '';
     const max = Math.min(items.length, 50);
-    for (let i=0;i<max;i++){
-      const c = items[i] || {};
-      const L = getLineObject(c);
-      const a = (L?.selectionA) || (c?.selectionA) || (c?.home_team) || 'A';
-      const b = (L?.selectionB) || (c?.selectionB) || (c?.away_team) || 'B';
-      const pa = formatPrice((L && L.priceA) ?? (c?.priceA));
-      const pb = formatPrice((L && L.priceB) ?? (c?.priceB));
-      const ts = asTime(c.startsAt || c.start || c.commenceTime);
-      const lineId = (L && (L.id || L.lineId || L.externalId)) || '';  // <-- FIX: use nested line only
-      const contestId = c.id || c.contestId || '';                      // <-- contest id ONLY from contest
 
-      const started = (new Date(c.startsAt || c.commenceTime || 0).getTime() <= Date.now());
-      const disabledAttr = (!lineId || !contestId || started) ? 'disabled' : '';
+    for (let i=0;i<max;i++){
+      const c = items[i];
+      const L = (c && c.line) || c || {};
+      const a = L.selectionA || c?.bestLine?.selectionA || (c.away_team || 'A');
+      const b = L.selectionB || c?.bestLine?.selectionB || (c.home_team || 'B');
+      const pa = formatPrice(L.priceA ?? c?.bestLine?.priceA ?? c?.priceA);
+      const pb = formatPrice(L.priceB ?? c?.bestLine?.priceB ?? c?.priceB);
+      const ts = asTime(c.startsAt || c.start || c.commence_time || c.commenceTime);
+      // robust id harvesting
+      const lineId = (origin==='db') ? (L.id || L.lineId) : (L.id && typeof L.id==='string' && L.id.startsWith('cl') ? L.id : '');
+      const contestId = (origin==='db') ? (c.id || c.contestId || L.contestId) : '';
+
+      const missingId = !lineId || !contestId;
+      const disabled = (origin!=='db') || missingId;
 
       html += `
-        <div class="line-row">
+        <div class="line-row" data-origin="${origin}" data-a="${escapeHtml(a)}" data-b="${escapeHtml(b)}" data-pa="${escapeHtml(pa)}" data-pb="${escapeHtml(pb)}">
           <div class="teams">${escapeHtml(a)} vs ${escapeHtml(b)}</div>
           <div class="prices">${escapeHtml(pa)} · ${escapeHtml(pb)}</div>
-          <div class="time">${ts || ''}</div>
+          <div class="time">${ts}</div>
           <div class="stake-row">
-            <input type="number" min="1" step="1" placeholder="Stake" class="stake-input"
-                   data-line="${escapeHtml(String(lineId))}"
-                   data-contest="${escapeHtml(String(contestId))}">
-            <button class="betA" ${disabledAttr}
-                    data-line="${escapeHtml(String(lineId))}"
-                    data-contest="${escapeHtml(String(contestId))}"
-                    data-team="${escapeHtml(String(a))}"
-                    data-price="${escapeHtml(String((L && L.priceA)!=null?L.priceA:''))}">Bet ${escapeHtml(a)}</button>
-            <button class="betB" ${disabledAttr}
-                    data-line="${escapeHtml(String(lineId))}"
-                    data-contest="${escapeHtml(String(contestId))}"
-                    data-team="${escapeHtml(String(b))}"
-                    data-price="${escapeHtml(String((L && L.priceB)!=null?L.priceB:''))}">Bet ${escapeHtml(b)}</button>
+            <input type="number" min="1" step="1" placeholder="Stake" class="stake-input" data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">
+            <button class="betA" ${disabled?'disabled':''} data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">Bet ${escapeHtml(a)}</button>
+            <button class="betB" ${disabled?'disabled':''} data-line="${escapeHtml(String(lineId||''))}" data-contest="${escapeHtml(String(contestId||''))}">Bet ${escapeHtml(b)}</button>
           </div>
-          ${(!lineId || !contestId) ? `<div class="muted">Syncing lines… tap Refresh.</div>` : ``}
+          ${disabled ? `<div class="muted">Syncing official lines… buttons enable automatically.</div>` : ``}
         </div>`;
     }
     target.innerHTML = html;
 
+    // Bind bet buttons
     target.querySelectorAll('.betA, .betB').forEach(btn=>{
       btn.addEventListener('click', async ()=>{
         if (!CURRENT_WALLET) return alert('Verify wallet first');
+        if (btn.disabled) { toast('Still syncing official lines…'); return; }
+
+        const row = btn.closest('.line-row');
+        const a = row?.getAttribute('data-a') || 'A';
+        const b = row?.getAttribute('data-b') || 'B';
+        const pa = row?.getAttribute('data-pa') || '';
+        const pb = row?.getAttribute('data-pb') || '';
 
         const side = btn.classList.contains('betA') ? 'A' : 'B';
-        const lineId = btn.getAttribute('data-line') || '';
-        const contestId = btn.getAttribute('data-contest') || '';
-        const team = btn.getAttribute('data-team') || (side==='A'?'A':'B');
-        const priceRaw = btn.getAttribute('data-price');
-        const price = (priceRaw==='' || priceRaw==null) ? null : Number(priceRaw);
-
-        const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId)}"]`);
+        const lineId = btn.getAttribute('data-line');
+        const contestId = btn.getAttribute('data-contest');
+        const input = target.querySelector(`.stake-input[data-line="${CSS.escape(lineId||'')}"]`);
         const stake = Number(input && input.value ? input.value : '0');
         if (!Number.isInteger(stake) || stake <= 0) return alert('Enter a valid integer stake');
-        if (!lineId || !contestId) return alert('Line still syncing for this game. Tap Refresh and try again.');
 
         try {
-          const res = await fetchJSON(API_BASE + '/bets/wallet', {
+          const j = await fetchJSON(API_BASE + '/bets/wallet', {
             method: 'POST',
-            body: JSON.stringify({ wallet: CURRENT_WALLET, lineId, side, stake, contestId, selectionAtBet: team, priceAtBet: price })
+            body: JSON.stringify({ wallet: CURRENT_WALLET, lineId, side, stake, contestId })
           });
-          showToast(`Bet ${team} ${price!=null?formatPrice(price):''} · Stake ${stake} — placed`);
+          // show friendly toast with snapshot-like info
+          const pair = `${side==='A'?a:b} ${side==='A'?pa:pb}`;
+          toast(`Bet ${pair} · Stake ${stake} — placed`);
           if (input) input.value = '';
           await refreshMyWeek();
         } catch (e) {
-          alert(e && e.message ? e.message : String(e));
+          alert((e && e.message) || String(e));
         }
       });
     });
-  }
-
-  function setBusy(sport,busy){
-    const btn=document.querySelector('[data-action="refresh"][data-sport="'+sport+'"]');
-    if (!btn) return;
-    btn.disabled = !!busy;
-    btn.textContent = busy ? 'Loading…' : 'Refresh';
-  }
-
-  async function loadSport(sport){
-    const box = document.querySelector('[data-sport="'+sport+'"] .lines');
-    if (!box) return;
-    setBusy(sport,true); box.textContent = 'Loading...';
-    try {
-      const lines = await fetchLines(sport);
-      renderLines(box, lines, sport);
-    } catch (e) {
-      box.textContent = 'Failed to load lines.';
-    } finally {
-      setBusy(sport,false);
-    }
   }
 
   function bindRefresh(){
@@ -286,6 +309,9 @@
     const walletStatus = document.getElementById('walletStatus');
 
     if (CURRENT_WALLET && walletInput) walletInput.value = CURRENT_WALLET;
+
+    // background sync on boot (prevents empty ids)
+    kickoffSync();
 
     if (verifyBtn) {
       verifyBtn.addEventListener('click', async ()=>{
